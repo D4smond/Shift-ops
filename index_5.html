@@ -1,0 +1,1021 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shift Ops — Scheduling & Fair-Share Ecosystem</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #17161c;
+    --panel: #1f1e26;
+    --panel-raised: #262530;
+    --line: #34323e;
+    --ink: #ece9e2;
+    --muted: #93909c;
+    --gold: #c9a24b;
+    --gold-soft: rgba(201, 162, 75, 0.14);
+    --rust: #c0654a;
+    --rust-soft: rgba(192, 101, 74, 0.15);
+    --sage: #7f9e7a;
+    --sage-soft: rgba(127, 158, 122, 0.15);
+    --swap: #6e8df0;
+    --swap-soft: rgba(110, 141, 240, 0.14);
+    --swap-deep: #232a42;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'IBM Plex Sans', -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    line-height: 1.55;
+    padding: 32px 16px 72px;
+  }
+  .wrap { max-width: 840px; margin: 0 auto; }
+  h1 { font-family: 'Fraunces', serif; font-size: 2rem; font-weight: 600; margin: 0 0 6px; letter-spacing: -0.01em; }
+  .sub { color: var(--muted); font-size: 0.95rem; margin: 0 0 28px; max-width: 54ch; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 22px; margin-bottom: 18px; }
+  .card h2 { font-family: 'Fraunces', serif; font-size: 1.15rem; font-weight: 600; margin: 0 0 4px; }
+  .card .desc { color: var(--muted); font-size: 0.85rem; margin: 0 0 18px; }
+  form { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  form .full { grid-column: 1 / -1; }
+  label { display: block; font-size: 0.78rem; color: var(--muted); margin-bottom: 5px; }
+  input, select {
+    width: 100%; padding: 9px 11px; border: 1px solid var(--line); border-radius: 7px;
+    font-size: 0.92rem; background: var(--panel-raised); color: var(--ink); font-family: inherit;
+  }
+  input:focus, select:focus { outline: 1px solid var(--gold); outline-offset: 1px; }
+  button.primary {
+    background: var(--gold); color: #1f1a10; border: none; padding: 10px 16px; border-radius: 7px;
+    font-size: 0.9rem; font-weight: 600; cursor: pointer; font-family: inherit;
+  }
+  button.primary:hover { opacity: 0.9; }
+  button.primary:disabled { opacity: 0.4; cursor: not-allowed; }
+  button.ghost {
+    background: none; border: 1px solid var(--line); color: var(--ink); padding: 9px 14px;
+    border-radius: 7px; font-size: 0.85rem; cursor: pointer; font-family: inherit;
+  }
+  button.ghost:hover { border-color: var(--gold); color: var(--gold); }
+  .del { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 0.8rem; padding: 0; }
+  .del:hover { color: var(--rust); }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 18px; }
+  .stat { background: var(--gold-soft); border-radius: 10px; padding: 14px 16px; }
+  .stat .num { font-family: 'Fraunces', serif; font-size: 1.35rem; font-weight: 600; color: var(--gold); }
+  .stat .label { font-size: 0.76rem; color: var(--muted); margin-top: 2px; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+  th, td { text-align: left; padding: 9px 6px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 500; font-size: 0.74rem; }
+  .job-tag { display: inline-block; padding: 2px 9px; border-radius: 100px; background: var(--gold-soft); color: var(--gold); font-size: 0.76rem; font-weight: 600; }
+  .role-tag { display: inline-block; padding: 3px 10px; border-radius: 100px; background: var(--sage-soft); color: var(--sage); font-size: 0.78rem; font-weight: 600; }
+  .empty { color: var(--muted); font-size: 0.88rem; padding: 10px 0; }
+  .worker-card { border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin-bottom: 14px; background: var(--panel-raised); }
+  .worker-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+  .worker-name { font-weight: 600; font-size: 0.95rem; }
+  .worker-total { font-family: 'Fraunces', serif; color: var(--gold); font-weight: 600; }
+  .fair-track { height: 6px; background: var(--line); border-radius: 100px; overflow: hidden; margin-bottom: 12px; }
+  .fair-fill { height: 100%; background: var(--gold); border-radius: 100px; }
+  .shift-row { display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; padding: 5px 0; border-bottom: 1px dashed var(--line); gap: 8px; }
+  .shift-row:last-child { border-bottom: none; }
+  .fairness-banner { display: flex; justify-content: space-between; align-items: center; background: var(--gold-soft); border-radius: 8px; padding: 10px 14px; font-size: 0.85rem; margin-bottom: 16px; }
+  .fairness-banner .val { color: var(--gold); font-weight: 600; }
+  .swap-card { border: 1px solid var(--sage); background: var(--sage-soft); border-radius: 10px; padding: 14px; margin-bottom: 10px; font-size: 0.85rem; }
+  .swap-card .swap-title { font-weight: 600; margin-bottom: 6px; color: var(--sage); }
+  .req-card { border: 1px solid var(--gold); background: var(--gold-soft); border-radius: 10px; padding: 14px; margin-bottom: 10px; font-size: 0.85rem; }
+  .req-card .req-actions { display: flex; gap: 8px; margin-top: 10px; }
+  .unassigned-tag { color: var(--rust); font-size: 0.8rem; }
+  .status-pill { font-size: 0.74rem; padding: 2px 8px; border-radius: 100px; font-weight: 600; }
+  .status-pending { background: var(--gold-soft); color: var(--gold); }
+  .status-approved { background: var(--sage-soft); color: var(--sage); }
+  .status-rejected { background: var(--rust-soft); color: var(--rust); }
+
+  /* Login gate */
+  #loginGate { max-width: 420px; margin: 60px auto; }
+  .role-choice { display: flex; gap: 10px; margin-bottom: 16px; }
+  .role-choice button {
+    flex: 1; background: var(--panel-raised); border: 1px solid var(--line); color: var(--muted);
+    padding: 14px; border-radius: 10px; cursor: pointer; font-family: inherit; font-size: 0.88rem; font-weight: 600;
+  }
+  .role-choice button.selected { border-color: var(--gold); color: var(--gold); background: var(--gold-soft); }
+  .demo-note { font-size: 0.78rem; color: var(--muted); margin-top: 14px; line-height: 1.6; }
+
+  /* App shell */
+  #appShell { display: none; }
+  .session-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
+  .tabs { display: flex; gap: 4px; margin-bottom: 24px; border-bottom: 1px solid var(--line); }
+  .tab { background: none; border: none; color: var(--muted); font-family: inherit; font-size: 0.92rem; font-weight: 500; padding: 10px 4px; margin-right: 24px; cursor: pointer; border-bottom: 2px solid transparent; }
+  .tab.active { color: var(--gold); border-bottom-color: var(--gold); }
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  @media (max-width: 480px) {
+    form { grid-template-columns: 1fr; }
+    .stats { grid-template-columns: 1fr; }
+    .session-bar { flex-direction: column; align-items: flex-start; gap: 10px; }
+  }
+
+  /* Panel transitions */
+  .panel { display: none; opacity: 0; transform: translateY(6px); transition: opacity 0.2s ease, transform 0.2s ease; }
+  .panel.active { display: block; }
+  .panel.active.in { opacity: 1; transform: translateY(0); }
+  .tab { transition: color 0.15s ease, border-color 0.15s ease; }
+  button, .worker-card, .swap-card, .req-card { transition: transform 0.12s ease, opacity 0.15s ease, border-color 0.15s ease; }
+  button.primary:hover:not(:disabled), button.ghost:hover { transform: translateY(-1px); }
+  .role-choice button { transition: all 0.15s ease; }
+  .card { animation: cardIn 0.25s ease both; }
+  @keyframes cardIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* Toasts */
+  #toastContainer { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 999; display: flex; flex-direction: column; gap: 8px; align-items: center; }
+  .toast {
+    background: var(--panel-raised); border: 1px solid var(--line); color: var(--ink);
+    padding: 11px 18px; border-radius: 100px; font-size: 0.85rem; font-weight: 500;
+    opacity: 0; transform: translateY(16px); transition: opacity 0.25s ease, transform 0.25s ease;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.35); white-space: nowrap;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); }
+  .toast.success { border-color: var(--sage); color: var(--sage); }
+  .toast.error { border-color: var(--rust); color: var(--rust); }
+  .toast.info { border-color: var(--gold); color: var(--gold); }
+
+  /* Profile */
+  .avatar {
+    width: 56px; height: 56px; border-radius: 50%; object-fit: cover;
+    background: var(--panel-raised); border: 1px solid var(--line); flex-shrink: 0;
+  }
+  .avatar-lg { width: 92px; height: 92px; }
+  .avatar-placeholder {
+    display: flex; align-items: center; justify-content: center;
+    color: var(--muted); font-family: 'Fraunces', serif; font-size: 1.6rem; font-weight: 600;
+  }
+  .avatar-placeholder.avatar { font-size: 1.1rem; }
+  .profile-head { display: flex; gap: 16px; align-items: center; margin-bottom: 18px; }
+  .profile-name { font-family: 'Fraunces', serif; font-size: 1.2rem; font-weight: 600; }
+  .roster-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px dashed var(--line); }
+  .roster-row:last-child { border-bottom: none; }
+  .roster-info { flex: 1; }
+  .roster-name { font-weight: 600; font-size: 0.9rem; }
+  .roster-about { color: var(--muted); font-size: 0.78rem; margin-top: 2px; }
+  #sessionAvatar { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; border: 1px solid var(--line); }
+
+  /* Swap tab — distinct, bigger, rounder */
+  .card-swap {
+    background: linear-gradient(180deg, var(--swap-deep), var(--panel));
+    border: 1px solid var(--swap);
+    border-radius: 26px;
+    padding: 28px;
+    margin-bottom: 20px;
+    box-shadow: 0 10px 30px rgba(110, 141, 240, 0.08);
+  }
+  .card-swap h2 { font-size: 1.35rem; color: #dfe6ff; }
+  .card-swap .desc { font-size: 0.92rem; color: #a9b3d6; margin-bottom: 22px; }
+
+  .swap-listing-row {
+    background: var(--panel-raised);
+    border: 1px solid var(--swap-soft);
+    border-radius: 20px;
+    padding: 18px 20px;
+    margin-bottom: 14px;
+  }
+  .swap-listing-row .swap-item-title {
+    font-size: 1.02rem;
+    font-weight: 600;
+    color: #eef1ff;
+    margin-bottom: 4px;
+  }
+  .swap-listing-row .swap-item-meta {
+    font-size: 0.84rem;
+    color: #a9b3d6;
+    margin-bottom: 14px;
+  }
+  .swap-listing-row select {
+    border-radius: 14px;
+    border-color: var(--swap-soft);
+    padding: 11px 14px;
+    font-size: 0.92rem;
+  }
+  .swap-listing-row .swap-offer-btn {
+    background: var(--swap);
+    color: #0d1226;
+    border: none;
+    border-radius: 14px;
+    padding: 11px 20px;
+    font-size: 0.9rem;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .swap-listing-row .swap-offer-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+
+  .swap-card, .req-card {
+    border-radius: 22px;
+    padding: 20px 22px;
+    font-size: 0.92rem;
+    border-width: 1.5px;
+  }
+  .req-card { border-color: var(--swap); background: var(--swap-soft); }
+  .req-card .req-actions button { border-radius: 14px; padding: 10px 18px; }
+
+  .swap-toggle-row {
+    display: flex; justify-content: space-between; align-items: center;
+    background: var(--panel-raised); border: 1px solid var(--swap-soft);
+    border-radius: 18px; padding: 14px 18px; margin-bottom: 12px;
+  }
+  .swap-toggle-row button { border-radius: 100px; padding: 9px 18px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Shift Ops</h1>
+  <p class="sub">A small shift-scheduling ecosystem: workers optimize their own pay, coordinators allocate a shared shift pool fairly, and both sides negotiate swaps through one shared system.</p>
+
+  <!-- ================= LOGIN GATE ================= -->
+  <div id="loginGate" class="card">
+    <h2>Sign in</h2>
+    <p class="desc">Choose your role and enter the access code for it.</p>
+    <div class="role-choice">
+      <button id="chooseWorker" data-role="worker">Worker</button>
+      <button id="chooseCoordinator" data-role="coordinator">Coordinator / Team Lead</button>
+    </div>
+    <div id="workerPicker" style="display:none; margin-bottom:12px;">
+      <label for="workerSelect">Which worker are you?</label>
+      <select id="workerSelect"></select>
+    </div>
+    <label for="accessCode">Access code</label>
+    <input type="text" id="accessCode" placeholder="Enter code">
+    <div style="margin-top:14px;">
+      <button class="primary" id="signInBtn" disabled>Sign in</button>
+    </div>
+    <p class="demo-note">
+      This is a UI role simulation for demo purposes, not real authentication — codes are visible here on purpose.<br>
+      Worker code: <strong>WORKER123</strong> &nbsp;·&nbsp; Coordinator code: <strong>LEAD123</strong>
+    </p>
+  </div>
+
+  <!-- ================= APP SHELL ================= -->
+  <div id="appShell">
+    <div class="session-bar">
+      <span style="display:flex; align-items:center; gap:10px;">
+        <img id="sessionAvatar" style="display:none;" alt="">
+        <span class="role-tag" id="sessionRoleTag"></span>
+        <span id="sessionName" style="margin-left:2px; color:var(--muted); font-size:0.88rem;"></span>
+      </span>
+      <button class="ghost" id="signOutBtn">Switch role</button>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="shifts">Shifts</button>
+      <button class="tab" data-tab="swap">Swap</button>
+      <button class="tab" data-tab="profile" id="profileTabBtn">Profile</button>
+    </div>
+
+    <!-- ===== SHIFTS TAB ===== -->
+    <div class="panel active" id="panel-shifts">
+
+      <!-- Worker view -->
+      <div id="workerShiftsView" style="display:none;">
+        <div class="stats" id="soloStats"></div>
+        <div class="card">
+          <h2>Your shift offers</h2>
+          <p class="desc">Add every shift offer you've been given, even overlapping ones — the optimizer picks the non-overlapping combination that pays the most.</p>
+          <form id="soloForm">
+            <div><label for="s_job">Job</label><input type="text" id="s_job" placeholder="e.g. Security" required></div>
+            <div><label for="s_date">Date</label><input type="date" id="s_date" required></div>
+            <div><label for="s_start">Start</label><input type="time" id="s_start" required></div>
+            <div><label for="s_end">End</label><input type="time" id="s_end" required></div>
+            <div class="full"><label for="s_rate">Pay rate (£/hr)</label><input type="number" id="s_rate" step="0.01" min="0" placeholder="e.g. 12.50" required></div>
+            <div class="full"><button type="submit" class="primary">Add shift offer</button></div>
+          </form>
+        </div>
+        <div class="card"><h2>All offers</h2><div id="soloTable"></div></div>
+        <div class="card">
+          <h2>Optimal personal schedule</h2>
+          <p class="desc">Solved with weighted interval scheduling (dynamic programming).</p>
+          <div id="soloResult"></div>
+        </div>
+        <div class="card">
+          <h2>Team-assigned shifts</h2>
+          <p class="desc">Shifts your coordinator has allocated to you from the shared pool.</p>
+          <div id="workerAssignedView"></div>
+        </div>
+      </div>
+
+      <!-- Coordinator view -->
+      <div id="coordShiftsView" style="display:none;">
+        <div class="card">
+          <h2>Team roster</h2>
+          <form id="workerForm">
+            <div class="full"><label for="w_name">Worker name</label><input type="text" id="w_name" placeholder="e.g. Sam" required></div>
+            <div class="full"><button type="submit" class="primary">Add worker</button></div>
+          </form>
+          <div id="workerList" style="margin-top:14px;"></div>
+        </div>
+        <div class="card">
+          <h2>Open shift pool</h2>
+          <p class="desc">Shifts up for grabs across the team, not yet assigned to anyone.</p>
+          <form id="poolForm">
+            <div><label for="p_job">Job</label><input type="text" id="p_job" placeholder="e.g. Events" required></div>
+            <div><label for="p_date">Date</label><input type="date" id="p_date" required></div>
+            <div><label for="p_start">Start</label><input type="time" id="p_start" required></div>
+            <div><label for="p_end">End</label><input type="time" id="p_end" required></div>
+            <div class="full"><label for="p_rate">Pay rate (£/hr)</label><input type="number" id="p_rate" step="0.01" min="0" placeholder="e.g. 12.50" required></div>
+            <div class="full"><button type="submit" class="primary">Add to pool</button></div>
+          </form>
+          <div id="poolTable" style="margin-top:14px;"></div>
+        </div>
+        <div class="card">
+          <h2>Allocate fairly</h2>
+          <p class="desc">Greedy load-balancing — each shift goes to whichever eligible worker has currently earned least. The same approach used for multiprocessor scheduling, applied to people.</p>
+          <button class="primary" id="allocateBtn">Run allocation</button>
+          <div id="fairnessBanner" style="margin-top:16px;"></div>
+          <div id="allocationResult"></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ===== SWAP TAB ===== -->
+    <div class="panel" id="panel-swap">
+
+      <!-- Worker swap view -->
+      <div id="workerSwapView" style="display:none;">
+        <div class="card-swap">
+          <h2>List a shift for swap</h2>
+          <p class="desc">Only shifts you explicitly list here become visible to anyone else — nobody can browse your full schedule or see what you've earned.</p>
+          <div id="listShiftsView"></div>
+        </div>
+        <div class="card-swap">
+          <h2>Swap board</h2>
+          <p class="desc">Shifts colleagues have listed as open to swap. Offer one of yours in return to propose a trade.</p>
+          <div id="swapBoardView"></div>
+        </div>
+        <div class="card-swap">
+          <h2>Your requests</h2>
+          <div id="myRequestsView"></div>
+        </div>
+      </div>
+
+      <!-- Coordinator swap view -->
+      <div id="coordSwapView" style="display:none;">
+        <div class="card-swap">
+          <h2>Algorithm-suggested swaps</h2>
+          <p class="desc">A local-search pass over the allocation — trades between the highest and lowest earner that narrow the gap without creating a new clash.</p>
+          <div id="swapResult"></div>
+        </div>
+        <div class="card-swap">
+          <h2>Worker-submitted requests</h2>
+          <div id="pendingRequestsView"></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ===== PROFILE TAB ===== -->
+    <div class="panel" id="panel-profile">
+      <div class="card">
+        <h2>Your profile</h2>
+        <p class="desc">Shown to your coordinator on the team roster — a picture and a line about you, nothing else.</p>
+        <div class="profile-head">
+          <div id="avatarPreviewWrap"></div>
+          <div>
+            <div class="profile-name" id="profileNameDisplay"></div>
+            <label for="avatarInput" class="ghost" style="display:inline-block; margin-top:8px; padding:7px 12px; border-radius:7px; cursor:pointer; font-size:0.82rem; border:1px solid var(--line);">Change photo</label>
+            <input type="file" id="avatarInput" accept="image/*" style="display:none;">
+          </div>
+        </div>
+        <label for="aboutInput">About you</label>
+        <textarea id="aboutInput" rows="3" placeholder="e.g. Second-year CS student, mostly cover evening security and TA shifts." style="width:100%; padding:10px 11px; border:1px solid var(--line); border-radius:7px; background:var(--panel-raised); color:var(--ink); font-family:inherit; font-size:0.9rem; resize:vertical;"></textarea>
+        <div style="margin-top:14px;"><button class="primary" id="saveProfileBtn">Save profile</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toastContainer"></div>
+
+<script>
+  function money(n) { return "£" + n.toFixed(2); }
+  function calcHours(start, end) {
+    const [sh, sm] = start.split(':').map(Number);
+    const [eh, em] = end.split(':').map(Number);
+    let s = sh * 60 + sm, e = eh * 60 + em;
+    if (e <= s) e += 24 * 60;
+    return (e - s) / 60;
+  }
+  // probably a cleaner way to do this but it works
+  function timesOverlap(dateA, aStart, aEnd, dateB, bStart, bEnd) {
+    if (dateA !== dateB) return false;
+    const toMins = t => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+    let a1 = toMins(aStart), a2 = toMins(aEnd);
+    let b1 = toMins(bStart), b2 = toMins(bEnd);
+    if (a2 <= a1) a2 += 24 * 60;
+    if (b2 <= b1) b2 += 24 * 60;
+    return a1 < b2 && b1 < a2;
+  }
+  function timeLabel(s) {
+    return new Date(s.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) + ' · ' + s.start + '–' + s.end;
+  }
+  function showToast(msg, type = 'info') {
+    const container = document.getElementById('toastContainer');
+    const el = document.createElement('div');
+    el.className = 'toast ' + type;
+    el.textContent = msg;
+    container.appendChild(el);
+    requestAnimationFrame(() => el.classList.add('show'));
+    setTimeout(() => {
+      el.classList.remove('show');
+      setTimeout(() => el.remove(), 300);
+    }, 2600);
+  }
+
+  function uid() {
+    const t = Date.now().toString();
+    const r = Math.random().toString(36).slice(2, 6);
+    return t + r;
+  }
+
+  function loadProfiles() { return JSON.parse(localStorage.getItem('shiftOpsProfiles') || '{}'); }
+  function saveProfiles(p) { localStorage.setItem('shiftOpsProfiles', JSON.stringify(p)); }
+  function loadProfile(workerId) { return loadProfiles()[workerId] || { avatar: null, about: '' }; }
+
+  function renderProfile() {
+    if (session.role !== 'worker') return;
+    const profile = loadProfile(session.workerId);
+    document.getElementById('profileNameDisplay').textContent = session.name;
+    document.getElementById('aboutInput').value = profile.about || '';
+    document.getElementById('avatarPreviewWrap').innerHTML = avatarHtml(session.workerId, 'avatar-lg');
+  }
+
+  document.getElementById('avatarInput').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const profiles = loadProfiles();
+      profiles[session.workerId] = { ...loadProfile(session.workerId), avatar: reader.result };
+      saveProfiles(profiles);
+      renderProfile();
+      const avatarImg = document.getElementById('sessionAvatar');
+      avatarImg.src = reader.result;
+      avatarImg.style.display = 'inline-block';
+      showToast('Photo updated', 'success');
+    };
+    reader.readAsDataURL(file);
+  });
+
+  document.getElementById('saveProfileBtn').addEventListener('click', () => {
+    const profiles = loadProfiles();
+    profiles[session.workerId] = { ...loadProfile(session.workerId), about: document.getElementById('aboutInput').value };
+    saveProfiles(profiles);
+    showToast('Profile saved', 'success');
+  });
+
+  const CODES = { worker: 'WORKER123', coordinator: 'LEAD123' };
+  let session = JSON.parse(sessionStorage.getItem('shiftOpsSession') || 'null');
+  let pendingRole = null;
+
+  function loadWorkers() { return JSON.parse(localStorage.getItem('shiftOpsWorkers') || '[]'); }
+  function saveWorkers(w) { localStorage.setItem('shiftOpsWorkers', JSON.stringify(w)); }
+
+  document.getElementById('chooseWorker').addEventListener('click', () => selectRole('worker'));
+  document.getElementById('chooseCoordinator').addEventListener('click', () => selectRole('coordinator'));
+
+  function selectRole(role) {
+    pendingRole = role;
+    document.getElementById('chooseWorker').classList.toggle('selected', role === 'worker');
+    document.getElementById('chooseCoordinator').classList.toggle('selected', role === 'coordinator');
+    const picker = document.getElementById('workerPicker');
+    const select = document.getElementById('workerSelect');
+    if (role === 'worker') {
+      const workers = loadWorkers();
+      if (workers.length === 0) {
+        select.innerHTML = '<option value="">No workers on the roster yet</option>';
+      } else {
+        select.innerHTML = workers.map(w => `<option value="${w.id}">${w.name}</option>`).join('');
+      }
+      picker.style.display = 'block';
+    } else {
+      picker.style.display = 'none';
+    }
+    validateSignIn();
+  }
+
+  document.getElementById('accessCode').addEventListener('input', validateSignIn);
+
+  function validateSignIn() {
+    const code = document.getElementById('accessCode').value.trim();
+    const ok = pendingRole && code === CODES[pendingRole] &&
+      (pendingRole !== 'worker' || (loadWorkers().length > 0 && document.getElementById('workerSelect').value));
+    document.getElementById('signInBtn').disabled = !ok;
+  }
+  document.getElementById('workerSelect').addEventListener('change', validateSignIn);
+
+  document.getElementById('signInBtn').addEventListener('click', () => {
+    if (pendingRole === 'worker') {
+      const workerId = document.getElementById('workerSelect').value;
+      const worker = loadWorkers().find(w => w.id === workerId);
+      session = { role: 'worker', workerId, name: worker.name };
+    } else {
+      session = { role: 'coordinator', name: 'Coordinator' };
+    }
+    sessionStorage.setItem('shiftOpsSession', JSON.stringify(session));
+    enterApp();
+  });
+
+  document.getElementById('signOutBtn').addEventListener('click', () => {
+    sessionStorage.removeItem('shiftOpsSession');
+    session = null;
+    document.getElementById('appShell').style.display = 'none';
+    document.getElementById('loginGate').style.display = 'block';
+  });
+
+  function initials(name) { return (name || '?').trim().charAt(0).toUpperCase(); }
+
+  function avatarHtml(workerId, size = '') {
+    const profile = loadProfile(workerId);
+    const worker = loadWorkers().find(w => w.id === workerId);
+    const cls = 'avatar' + (size ? ' ' + size : '');
+    if (profile.avatar) return `<img class="${cls}" src="${profile.avatar}" alt="">`;
+    return `<div class="${cls} avatar-placeholder">${initials(worker ? worker.name : '?')}</div>`;
+  }
+
+  function enterApp() {
+    document.getElementById('loginGate').style.display = 'none';
+    document.getElementById('appShell').style.display = 'block';
+    document.getElementById('sessionRoleTag').textContent = session.role === 'worker' ? 'Worker' : 'Coordinator';
+    document.getElementById('sessionName').textContent = session.role === 'worker' ? session.name : 'Full team access';
+    document.getElementById('profileTabBtn').style.display = session.role === 'worker' ? 'inline-block' : 'none';
+
+    const avatarImg = document.getElementById('sessionAvatar');
+    if (session.role === 'worker') {
+      const profile = loadProfile(session.workerId);
+      if (profile.avatar) { avatarImg.src = profile.avatar; avatarImg.style.display = 'inline-block'; }
+      else avatarImg.style.display = 'none';
+    } else {
+      avatarImg.style.display = 'none';
+    }
+
+    document.getElementById('workerShiftsView').style.display = session.role === 'worker' ? 'block' : 'none';
+    document.getElementById('coordShiftsView').style.display = session.role === 'coordinator' ? 'block' : 'none';
+    document.getElementById('workerSwapView').style.display = session.role === 'worker' ? 'block' : 'none';
+    document.getElementById('coordSwapView').style.display = session.role === 'coordinator' ? 'block' : 'none';
+
+    if (session.role === 'worker') {
+      renderSolo();
+      renderWorkerAssigned();
+      renderListShifts();
+      renderSwapBoard();
+      renderMyRequests();
+      renderProfile();
+    } else {
+      renderWorkers();
+      renderPool();
+      renderAllocationIfAny();
+      renderPendingRequests();
+    }
+  }
+
+  if (session) enterApp();
+
+  document.querySelectorAll('.tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const current = document.querySelector('.panel.active');
+      const next = document.getElementById('panel-' + btn.dataset.tab);
+      if (current === next) return;
+      document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      if (current) { current.classList.remove('in'); current.classList.remove('active'); }
+      next.classList.add('active');
+      requestAnimationFrame(() => requestAnimationFrame(() => next.classList.add('in')));
+      if (btn.dataset.tab === 'profile') renderProfile();
+    });
+  });
+  requestAnimationFrame(() => requestAnimationFrame(() => document.querySelector('.panel.active')?.classList.add('in')));
+
+  function soloKey() { return 'shiftOpsSolo_' + session.workerId; }
+  function loadSolo() { return JSON.parse(localStorage.getItem(soloKey()) || '[]'); }
+  function saveSolo(shifts) { localStorage.setItem(soloKey(), JSON.stringify(shifts)); }
+
+  // dp bit, took me a while to get right
+  function solveSchedule(shifts) {
+    if (shifts.length === 0) return { chosen: [], total: 0 };
+    const items = shifts.map(s => ({ ...s, hours: calcHours(s.start, s.end), value: calcHours(s.start, s.end) * s.rate }))
+      .sort((a, b) => new Date(a.date + 'T' + a.end) - new Date(b.date + 'T' + b.end));
+    const n = items.length;
+    const dp = new Array(n).fill(0), take = new Array(n).fill(false), prevCompatible = new Array(n).fill(-1);
+    for (let i = 0; i < n; i++) {
+      for (let j = i - 1; j >= 0; j--) {
+        if (!timesOverlap(items[i].date, items[i].start, items[i].end, items[j].date, items[j].start, items[j].end)) { prevCompatible[i] = j; break; }
+      }
+    }
+    for (let i = 0; i < n; i++) {
+      const withThis = items[i].value + (prevCompatible[i] >= 0 ? dp[prevCompatible[i]] : 0);
+      const withoutThis = i > 0 ? dp[i - 1] : 0;
+      if (withThis > withoutThis) { dp[i] = withThis; take[i] = true; } else { dp[i] = withoutThis; take[i] = false; }
+    }
+    const chosen = [];
+    let i = n - 1;
+    while (i >= 0) { if (take[i]) { chosen.push(items[i]); i = prevCompatible[i]; } else { i--; } }
+    return { chosen: chosen.reverse(), total: n > 0 ? dp[n - 1] : 0 };
+  }
+
+  function renderSolo() {
+    const soloShifts = loadSolo();
+    const items = soloShifts.map(s => ({ ...s, hours: calcHours(s.start, s.end), value: calcHours(s.start, s.end) * s.rate }));
+    const totalOffered = items.reduce((sum, s) => sum + s.value, 0);
+
+    document.getElementById('soloStats').innerHTML = `
+      <div class="stat"><div class="num">${items.length}</div><div class="label">Shift offers logged</div></div>
+      <div class="stat"><div class="num">${money(totalOffered)}</div><div class="label">Total if all were compatible</div></div>
+      <div class="stat"><div class="num" id="soloOptimalNum">—</div><div class="label">Optimal achievable pay</div></div>
+    `;
+
+    const tableEl = document.getElementById('soloTable');
+    if (items.length === 0) {
+      tableEl.innerHTML = '<p class="empty">No shift offers yet.</p>';
+    } else {
+      tableEl.innerHTML = `<table><thead><tr><th>Job</th><th>When</th><th>Hours</th><th>Rate</th><th>Value</th><th></th></tr></thead><tbody>
+        ${items.map(s => `<tr><td><span class="job-tag">${s.job}</span></td><td>${timeLabel(s)}</td><td>${s.hours.toFixed(2)}h</td><td>£${s.rate.toFixed(2)}</td><td>${money(s.value)}</td><td><button class="del" data-id="${s.id}">Remove</button></td></tr>`).join('')}
+      </tbody></table>`;
+      tableEl.querySelectorAll('.del').forEach(btn => {
+        btn.addEventListener('click', () => { saveSolo(loadSolo().filter(s => s.id !== btn.dataset.id)); renderSolo(); });
+      });
+    }
+
+    const resultEl = document.getElementById('soloResult');
+    if (items.length === 0) { resultEl.innerHTML = '<p class="empty">Nothing to optimize yet.</p>'; return; }
+    const { chosen, total } = solveSchedule(soloShifts);
+    document.getElementById('soloOptimalNum').textContent = money(total);
+    resultEl.innerHTML = `<table><thead><tr><th>Job</th><th>When</th><th>Hours</th><th>Pay</th></tr></thead><tbody>
+      ${chosen.map(s => `<tr><td><span class="job-tag">${s.job}</span></td><td>${timeLabel(s)}</td><td>${s.hours.toFixed(2)}h</td><td>${money(s.value)}</td></tr>`).join('')}
+    </tbody></table>`;
+  }
+
+  document.getElementById('soloForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const shifts = loadSolo();
+    shifts.push({ id: uid(), job: document.getElementById('s_job').value, date: document.getElementById('s_date').value, start: document.getElementById('s_start').value, end: document.getElementById('s_end').value, rate: parseFloat(document.getElementById('s_rate').value) });
+    saveSolo(shifts);
+    e.target.reset();
+    renderSolo();
+    showToast('Shift offer added', 'success');
+  });
+
+  function loadPool() { return JSON.parse(localStorage.getItem('shiftOpsPool') || '[]'); }
+  function savePool(p) { localStorage.setItem('shiftOpsPool', JSON.stringify(p)); }
+  function loadAllocation() { return JSON.parse(localStorage.getItem('shiftOpsAllocation') || 'null'); }
+  function saveAllocation(a) { localStorage.setItem('shiftOpsAllocation', JSON.stringify(a)); }
+  function loadRequests() { return JSON.parse(localStorage.getItem('shiftOpsSwapRequests') || '[]'); }
+  function saveRequests(r) { localStorage.setItem('shiftOpsSwapRequests', JSON.stringify(r)); }
+
+  function renderWorkers() {
+    const workers = loadWorkers();
+    const el = document.getElementById('workerList');
+    el.innerHTML = workers.length === 0
+      ? '<p class="empty">Add at least two workers to allocate a shift pool between them.</p>'
+      : workers.map(w => {
+          const profile = loadProfile(w.id);
+          return `<div class="roster-row">
+            ${avatarHtml(w.id)}
+            <div class="roster-info">
+              <div class="roster-name">${w.name}</div>
+              ${profile.about ? `<div class="roster-about">${profile.about}</div>` : ''}
+            </div>
+            <button class="del" data-id="${w.id}">Remove</button>
+          </div>`;
+        }).join('');
+    el.querySelectorAll('.del').forEach(btn => {
+      btn.addEventListener('click', () => {
+        saveWorkers(loadWorkers().filter(w => w.id !== btn.dataset.id));
+        localStorage.removeItem('shiftOpsAllocation');
+        renderWorkers();
+        document.getElementById('fairnessBanner').innerHTML = '';
+        document.getElementById('allocationResult').innerHTML = '';
+        showToast('Worker removed', 'info');
+      });
+    });
+  }
+
+  function renderPool() {
+    const pool = loadPool();
+    const items = pool.map(s => ({ ...s, hours: calcHours(s.start, s.end), value: calcHours(s.start, s.end) * s.rate }));
+    const el = document.getElementById('poolTable');
+    el.innerHTML = items.length === 0 ? '<p class="empty">No open shifts yet.</p>' :
+      `<table><thead><tr><th>Job</th><th>When</th><th>Value</th><th></th></tr></thead><tbody>
+        ${items.map(s => `<tr><td><span class="job-tag">${s.job}</span></td><td>${timeLabel(s)}</td><td>${money(s.value)}</td><td><button class="del" data-id="${s.id}">Remove</button></td></tr>`).join('')}
+      </tbody></table>`;
+    el.querySelectorAll('.del').forEach(btn => {
+      btn.addEventListener('click', () => { savePool(loadPool().filter(s => s.id !== btn.dataset.id)); renderPool(); });
+    });
+  }
+
+  function allocateFairly() {
+    const workers = loadWorkers();
+    const items = loadPool().map(s => ({ ...s, hours: calcHours(s.start, s.end), value: calcHours(s.start, s.end) * s.rate }))
+      .sort((a, b) => b.value - a.value);
+    const assigned = {}, totals = {};
+    workers.forEach(w => { assigned[w.id] = []; totals[w.id] = 0; });
+    const unassigned = [];
+    items.forEach(shift => {
+      const eligible = workers.filter(w => !assigned[w.id].some(ex => timesOverlap(shift.date, shift.start, shift.end, ex.date, ex.start, ex.end)));
+      if (eligible.length === 0) { unassigned.push(shift); return; }
+      eligible.sort((a, b) => totals[a.id] - totals[b.id]);
+      assigned[eligible[0].id].push(shift);
+      totals[eligible[0].id] += shift.value;
+    });
+    return { assigned, totals, unassigned };
+  }
+
+  function findSwapSuggestions(assigned, totals) {
+    const ids = Object.keys(totals);
+    if (ids.length < 2) return [];
+    const sorted = [...ids].sort((a, b) => totals[b] - totals[a]);
+    const highId = sorted[0], lowId = sorted[sorted.length - 1];
+    const gap = totals[highId] - totals[lowId];
+    if (gap < 0.01) return [];
+    const suggestions = [];
+    assigned[highId].forEach(hShift => {
+      assigned[lowId].forEach(lShift => {
+        const hRest = assigned[highId].filter(s => s.id !== hShift.id);
+        const lRest = assigned[lowId].filter(s => s.id !== lShift.id);
+        const hClash = hRest.some(s => timesOverlap(lShift.date, lShift.start, lShift.end, s.date, s.start, s.end));
+        const lClash = lRest.some(s => timesOverlap(hShift.date, hShift.start, hShift.end, s.date, s.start, s.end));
+        if (hClash || lClash) return;
+        const newHighTotal = totals[highId] - hShift.value + lShift.value;
+        const newLowTotal = totals[lowId] - lShift.value + hShift.value;
+        const newGap = Math.abs(newHighTotal - newLowTotal);
+        if (newGap < gap - 0.01) suggestions.push({ highId, lowId, hShift, lShift, newGap, oldGap: gap });
+      });
+    });
+    return suggestions.sort((a, b) => a.newGap - b.newGap).slice(0, 3);
+  }
+
+  function renderAllocationIfAny() {
+    const a = loadAllocation();
+    if (a) renderAllocation(a);
+  }
+
+  function renderAllocation(allocation) {
+    saveAllocation(allocation);
+    const { assigned, totals, unassigned } = allocation;
+    const workers = loadWorkers();
+    const workerName = id => (workers.find(w => w.id === id) || {}).name || '—';
+    const totalValues = Object.values(totals);
+    const maxTotal = Math.max(...totalValues, 0.01);
+    const gap = totalValues.length ? Math.max(...totalValues) - Math.min(...totalValues) : 0;
+
+    document.getElementById('fairnessBanner').innerHTML = `<div class="fairness-banner"><span>Spread between highest and lowest earner</span><span class="val">${money(gap)}</span></div>`;
+
+    document.getElementById('allocationResult').innerHTML = workers.map(w => `
+      <div class="worker-card">
+        <div class="worker-head"><span class="worker-name">${w.name}</span><span class="worker-total">${money(totals[w.id] || 0)}</span></div>
+        <div class="fair-track"><div class="fair-fill" style="width:${((totals[w.id] || 0) / maxTotal) * 100}%"></div></div>
+        ${(assigned[w.id] || []).length === 0 ? '<p class="empty">No shifts assigned.</p>' :
+          assigned[w.id].map(s => `<div class="shift-row"><span>${s.job} · ${timeLabel(s)}</span><span>${money(s.value)}</span></div>`).join('')}
+      </div>
+    `).join('') + (unassigned.length > 0 ? `<p class="unassigned-tag">${unassigned.length} shift(s) couldn't be assigned without a clash.</p>` : '');
+
+    if (session.role === 'coordinator') renderSwapSuggestions(allocation);
+  }
+
+  document.getElementById('workerForm')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const workers = loadWorkers();
+    workers.push({ id: uid(), name: document.getElementById('w_name').value });
+    saveWorkers(workers);
+    e.target.reset();
+    renderWorkers();
+    showToast('Worker added', 'success');
+  });
+
+  document.getElementById('poolForm')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const pool = loadPool();
+    pool.push({ id: uid(), job: document.getElementById('p_job').value, date: document.getElementById('p_date').value, start: document.getElementById('p_start').value, end: document.getElementById('p_end').value, rate: parseFloat(document.getElementById('p_rate').value) });
+    savePool(pool);
+    e.target.reset();
+    renderPool();
+    showToast('Added to pool', 'success');
+  });
+
+  document.getElementById('allocateBtn')?.addEventListener('click', () => {
+    if (loadWorkers().length < 2) { showToast('Add at least two workers first.', 'error'); return; }
+    if (loadPool().length === 0) { showToast('Add some shifts to the pool first.', 'error'); return; }
+    renderAllocation(allocateFairly());
+    showToast('Allocation complete', 'success');
+  });
+
+  function renderSwapSuggestions(allocation) {
+    const suggestions = findSwapSuggestions(allocation.assigned, allocation.totals);
+    const workers = loadWorkers();
+    const workerName = id => (workers.find(w => w.id === id) || {}).name || '—';
+    const el = document.getElementById('swapResult');
+    if (!el) return;
+    el.innerHTML = suggestions.length === 0
+      ? '<p class="empty">No beneficial swap found — the current split is already close to balanced.</p>'
+      : suggestions.map((sug, idx) => `
+        <div class="swap-card">
+          <div class="swap-title">Swap ${idx + 1}</div>
+          Give <strong>${sug.hShift.job}</strong> (${timeLabel(sug.hShift)}) from ${workerName(sug.highId)} to ${workerName(sug.lowId)},<br>
+          and <strong>${sug.lShift.job}</strong> (${timeLabel(sug.lShift)}) from ${workerName(sug.lowId)} to ${workerName(sug.highId)}.<br>
+          Narrows the gap from ${money(sug.oldGap)} to ${money(sug.newGap)}.
+          <div><button class="ghost apply-swap" data-idx="${idx}">Apply this swap</button></div>
+        </div>
+      `).join('');
+    el.querySelectorAll('.apply-swap').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const sug = suggestions[btn.dataset.idx];
+        const allocation = loadAllocation();
+        allocation.assigned[sug.highId] = allocation.assigned[sug.highId].filter(s => s.id !== sug.hShift.id).concat(sug.lShift);
+        allocation.assigned[sug.lowId] = allocation.assigned[sug.lowId].filter(s => s.id !== sug.lShift.id).concat(sug.hShift);
+        allocation.totals[sug.highId] = allocation.totals[sug.highId] - sug.hShift.value + sug.lShift.value;
+        allocation.totals[sug.lowId] = allocation.totals[sug.lowId] - sug.lShift.value + sug.hShift.value;
+        renderAllocation(allocation);
+        showToast('Swap applied', 'success');
+      });
+    });
+  }
+
+  function loadListings() { return JSON.parse(localStorage.getItem('shiftOpsListings') || '[]'); }
+  function saveListings(l) { localStorage.setItem('shiftOpsListings', JSON.stringify(l)); }
+
+  function renderListShifts() {
+    const allocation = loadAllocation();
+    const el = document.getElementById('listShiftsView');
+    const myShifts = allocation ? (allocation.assigned[session.workerId] || []) : [];
+    if (myShifts.length === 0) {
+      el.innerHTML = '<p class="empty">You have no team-assigned shifts to list yet.</p>';
+      return;
+    }
+    const listings = loadListings();
+    const isListed = shiftId => listings.some(l => l.workerId === session.workerId && l.shiftId === shiftId);
+
+    el.innerHTML = myShifts.map(s => `
+      <div class="swap-toggle-row">
+        <span><strong>${s.job}</strong> · ${timeLabel(s)} · ${money(s.value)}</span>
+        <button class="swap-offer-btn" style="${isListed(s.id) ? 'background:var(--line); color:var(--ink);' : ''}" data-toggle="${s.id}">${isListed(s.id) ? 'Remove listing' : 'List for swap'}</button>
+      </div>
+    `).join('');
+
+    el.querySelectorAll('[data-toggle]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const shiftId = btn.dataset.toggle;
+        let listings = loadListings();
+        if (listings.some(l => l.workerId === session.workerId && l.shiftId === shiftId)) {
+          listings = listings.filter(l => !(l.workerId === session.workerId && l.shiftId === shiftId));
+        } else {
+          listings.push({ workerId: session.workerId, shiftId });
+        }
+        saveListings(listings);
+        renderListShifts();
+        renderSwapBoard();
+        showToast(listings.some(l => l.workerId === session.workerId && l.shiftId === shiftId) ? 'Listed for swap' : 'Listing removed', 'info');
+      });
+    });
+  }
+
+  function renderSwapBoard() {
+    const allocation = loadAllocation();
+    const workers = loadWorkers();
+    const name = id => (workers.find(w => w.id === id) || {}).name || '—';
+    const el = document.getElementById('swapBoardView');
+    const listings = loadListings().filter(l => l.workerId !== session.workerId);
+
+    const board = listings
+      .map(l => ({ ...l, shift: allocation ? shiftLookup(allocation, l.workerId, l.shiftId) : null }))
+      .filter(l => l.shift);
+
+    if (board.length === 0) {
+      el.innerHTML = '<p class="empty">No shifts listed for swap right now.</p>';
+      return;
+    }
+
+    const myShifts = allocation ? (allocation.assigned[session.workerId] || []) : [];
+
+    el.innerHTML = board.map((l, idx) => `
+      <div class="swap-listing-row">
+        <div class="swap-item-title">${l.shift.job} · ${timeLabel(l.shift)}</div>
+        <div class="swap-item-meta">${money(l.shift.value)} · listed by ${name(l.workerId)}</div>
+        ${myShifts.length === 0 ? '<span class="empty">You need an assigned shift of your own to offer in trade.</span>' : `
+          <div style="display:flex; gap:10px; align-items:center;">
+            <select data-offer-select="${idx}" style="flex:1;">
+              ${myShifts.map(s => `<option value="${s.id}">${s.job} · ${timeLabel(s)}</option>`).join('')}
+            </select>
+            <button class="swap-offer-btn" data-offer-btn="${idx}">Offer trade</button>
+          </div>
+        `}
+      </div>
+    `).join('');
+
+    el.querySelectorAll('[data-offer-btn]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = btn.dataset.offerBtn;
+        const listing = board[idx];
+        const myShiftId = el.querySelector(`[data-offer-select="${idx}"]`).value;
+        const requests = loadRequests();
+        requests.push({
+          id: uid(), status: 'pending',
+          fromWorkerId: session.workerId, fromShiftId: myShiftId,
+          toWorkerId: listing.workerId, toShiftId: listing.shiftId
+        });
+        saveRequests(requests);
+        renderMyRequests();
+        showToast('Trade offer sent for approval', 'success');
+      });
+    });
+  }
+
+  function shiftLookup(allocation, workerId, shiftId) {
+    return (allocation.assigned[workerId] || []).find(s => s.id === shiftId);
+  }
+
+  function renderMyRequests() {
+    const requests = loadRequests().filter(r => r.fromWorkerId === session.workerId);
+    const allocation = loadAllocation();
+    const workers = loadWorkers();
+    const name = id => (workers.find(w => w.id === id) || {}).name || '—';
+    const el = document.getElementById('myRequestsView');
+    el.innerHTML = requests.length === 0 ? '<p class="empty">No requests submitted yet.</p>' :
+      requests.map(r => {
+        const mine = allocation ? shiftLookup(allocation, r.fromWorkerId, r.fromShiftId) : null;
+        const theirs = allocation ? shiftLookup(allocation, r.toWorkerId, r.toShiftId) : null;
+        return `<div class="shift-row">
+          <span>${mine ? mine.job + ' ↔ ' + (theirs ? theirs.job : '—') + ' with ' + name(r.toWorkerId) : 'Shift no longer available'}</span>
+          <span class="status-pill status-${r.status}">${r.status}</span>
+        </div>`;
+      }).join('');
+  }
+
+  function renderWorkerAssigned() {
+    const allocation = loadAllocation();
+    const el = document.getElementById('workerAssignedView');
+    const mine = allocation ? (allocation.assigned[session.workerId] || []) : [];
+    el.innerHTML = mine.length === 0 ? '<p class="empty">No team-assigned shifts yet.</p>' :
+      `<table><thead><tr><th>Job</th><th>When</th><th>Pay</th></tr></thead><tbody>
+        ${mine.map(s => `<tr><td><span class="job-tag">${s.job}</span></td><td>${timeLabel(s)}</td><td>${money(s.value)}</td></tr>`).join('')}
+      </tbody></table>`;
+  }
+
+  function renderPendingRequests() {
+    const requests = loadRequests().filter(r => r.status === 'pending');
+    const allocation = loadAllocation();
+    const workers = loadWorkers();
+    const name = id => (workers.find(w => w.id === id) || {}).name || '—';
+    const el = document.getElementById('pendingRequestsView');
+    if (!el) return;
+    if (requests.length === 0 || !allocation) {
+      el.innerHTML = '<p class="empty">No pending requests.</p>';
+      return;
+    }
+    el.innerHTML = requests.map(r => {
+      const mine = shiftLookup(allocation, r.fromWorkerId, r.fromShiftId);
+      const theirs = shiftLookup(allocation, r.toWorkerId, r.toShiftId);
+      if (!mine || !theirs) return '';
+      return `<div class="req-card">
+        <strong>${name(r.fromWorkerId)}</strong> offers ${mine.job} (${timeLabel(mine)})<br>
+        for <strong>${name(r.toWorkerId)}</strong>'s ${theirs.job} (${timeLabel(theirs)})
+        <div class="req-actions">
+          <button class="primary" data-approve="${r.id}">Approve</button>
+          <button class="ghost" data-reject="${r.id}">Reject</button>
+        </div>
+      </div>`;
+    }).join('');
+
+    el.querySelectorAll('[data-approve]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const req = loadRequests().find(r => r.id === btn.dataset.approve);
+        const allocation = loadAllocation();
+        const mine = shiftLookup(allocation, req.fromWorkerId, req.fromShiftId);
+        const theirs = shiftLookup(allocation, req.toWorkerId, req.toShiftId);
+        const fromRest = allocation.assigned[req.fromWorkerId].filter(s => s.id !== mine.id);
+        const toRest = allocation.assigned[req.toWorkerId].filter(s => s.id !== theirs.id);
+        const clash = fromRest.some(s => timesOverlap(theirs.date, theirs.start, theirs.end, s.date, s.start, s.end)) ||
+                      toRest.some(s => timesOverlap(mine.date, mine.start, mine.end, s.date, s.start, s.end));
+        if (clash) { showToast('Cannot approve — creates a clash for one of them', 'error'); return; }
+
+        allocation.assigned[req.fromWorkerId] = fromRest.concat(theirs);
+        allocation.assigned[req.toWorkerId] = toRest.concat(mine);
+        allocation.totals[req.fromWorkerId] += theirs.value - mine.value;
+        allocation.totals[req.toWorkerId] += mine.value - theirs.value;
+        saveAllocation(allocation);
+
+        const requests = loadRequests().map(r => r.id === req.id ? { ...r, status: 'approved' } : r);
+        saveRequests(requests);
+        renderAllocation(allocation);
+        renderPendingRequests();
+        showToast('Swap approved', 'success');
+      });
+    });
+    el.querySelectorAll('[data-reject]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        saveRequests(loadRequests().map(r => r.id === btn.dataset.reject ? { ...r, status: 'rejected' } : r));
+        renderPendingRequests();
+        showToast('Request rejected', 'info');
+      });
+    });
+  }
+</script>
+</body>
+</html>
