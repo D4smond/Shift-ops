@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shift Ops — Scheduling & Fair-Share Ecosystem</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Shift Ops</h1>
+  <p class="sub">A small shift-scheduling ecosystem: workers optimize their own pay, coordinators allocate a shared shift pool fairly, and both sides negotiate swaps through one shared system.</p>
+
+  <!-- ================= LOGIN GATE ================= -->
+  <div id="loginGate" class="card">
+    <h2>Sign in</h2>
+    <p class="desc">Choose your role and enter the access code for it.</p>
+    <div class="role-choice">
+      <button id="chooseWorker" data-role="worker">Worker</button>
+      <button id="chooseCoordinator" data-role="coordinator">Coordinator / Team Lead</button>
+    </div>
+    <div id="workerPicker" style="display:none; margin-bottom:12px;">
+      <label for="workerSelect">Which worker are you?</label>
+      <select id="workerSelect"></select>
+    </div>
+    <label for="accessCode">Access code</label>
+    <input type="text" id="accessCode" placeholder="Enter code" autocomplete="off">
+    <div style="margin-top:14px;">
+      <button class="primary" id="signInBtn" disabled>Sign in</button>
+    </div>
+    <p class="demo-note">
+      This is a UI role simulation for demo purposes, not real authentication — codes are visible here on purpose.<br>
+      Worker code: <strong>WORKER123</strong> &nbsp;·&nbsp; Coordinator code: <strong>LEAD123</strong>
+    </p>
+    <!-- so anyone trying the live demo doesn't have to build a team from scratch first -->
+    <div style="display:flex; gap:8px; margin-top:12px;">
+      <button class="ghost" id="loadDemoBtn" type="button">Load sample team &amp; shifts</button>
+      <button class="ghost" id="resetBtn" type="button">Clear all data</button>
+    </div>
+  </div>
+
+  <!-- ================= APP SHELL ================= -->
+  <div id="appShell">
+    <div class="session-bar">
+      <span style="display:flex; align-items:center; gap:10px;">
+        <img id="sessionAvatar" style="display:none;" alt="">
+        <span class="role-tag" id="sessionRoleTag"></span>
+        <span id="sessionName" style="margin-left:2px; color:var(--muted); font-size:0.88rem;"></span>
+      </span>
+      <button class="ghost" id="signOutBtn">Switch role</button>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="shifts">Shifts</button>
+      <button class="tab" data-tab="swap">Swap</button>
+      <button class="tab" data-tab="profile" id="profileTabBtn">Profile</button>
+    </div>
+
+    <!-- ===== SHIFTS TAB ===== -->
+    <div class="panel active" id="panel-shifts">
+
+      <!-- Worker view -->
+      <div id="workerShiftsView" style="display:none;">
+        <div class="stats" id="soloStats"></div>
+        <div class="card">
+          <h2>Your shift offers</h2>
+          <p class="desc">Add every shift offer you've been given, even overlapping ones — the optimiser picks the non-overlapping combination that pays the most. Anything that clashes with a shift your coordinator has already given you is left out.</p>
+          <form id="soloForm">
+            <div><label for="s_job">Job</label><input type="text" id="s_job" placeholder="e.g. Security" required></div>
+            <div><label for="s_date">Date</label><input type="date" id="s_date" required></div>
+            <div><label for="s_start">Start</label><input type="time" id="s_start" required></div>
+            <div><label for="s_end">End</label><input type="time" id="s_end" required></div>
+            <div class="full"><label for="s_rate">Pay rate (£/hr)</label><input type="number" id="s_rate" step="0.01" min="0" placeholder="e.g. 12.50" required></div>
+            <div class="full"><button type="submit" class="primary">Add shift offer</button></div>
+          </form>
+        </div>
+        <div class="card"><h2>All offers</h2><div id="soloTable"></div></div>
+        <div class="card">
+          <h2>Optimal personal schedule</h2>
+          <p class="desc">Solved with weighted interval scheduling (dynamic programming).</p>
+          <div id="soloResult"></div>
+        </div>
+        <div class="card">
+          <h2>Team-assigned shifts</h2>
+          <p class="desc">Shifts your coordinator has allocated to you from the shared pool.</p>
+          <div id="workerAssignedView"></div>
+        </div>
+      </div>
+
+      <!-- Coordinator view -->
+      <div id="coordShiftsView" style="display:none;">
+        <div class="card">
+          <h2>Team roster</h2>
+          <form id="workerForm">
+            <div class="full"><label for="w_name">Worker name</label><input type="text" id="w_name" placeholder="e.g. Sam" required></div>
+            <div class="full"><button type="submit" class="primary">Add worker</button></div>
+          </form>
+          <div id="workerList" style="margin-top:14px;"></div>
+        </div>
+        <div class="card">
+          <h2>Open shift pool</h2>
+          <p class="desc">Shifts up for grabs across the team, not yet assigned to anyone.</p>
+          <form id="poolForm">
+            <div><label for="p_job">Job</label><input type="text" id="p_job" placeholder="e.g. Events" required></div>
+            <div><label for="p_date">Date</label><input type="date" id="p_date" required></div>
+            <div><label for="p_start">Start</label><input type="time" id="p_start" required></div>
+            <div><label for="p_end">End</label><input type="time" id="p_end" required></div>
+            <div class="full"><label for="p_rate">Pay rate (£/hr)</label><input type="number" id="p_rate" step="0.01" min="0" placeholder="e.g. 12.50" required></div>
+            <div class="full"><button type="submit" class="primary">Add to pool</button></div>
+          </form>
+          <div id="poolTable" style="margin-top:14px;"></div>
+        </div>
+        <div class="card">
+          <h2>Allocate fairly</h2>
+          <p class="desc">Greedy load-balancing — each shift goes to whichever eligible worker has currently earned least. The same approach used for multiprocessor scheduling, applied to people.</p>
+          <button class="primary" id="allocateBtn">Run allocation</button>
+          <div id="fairnessBanner" style="margin-top:16px;"></div>
+          <div id="allocationResult"></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ===== SWAP TAB ===== -->
+    <div class="panel" id="panel-swap">
+
+      <!-- Worker swap view -->
+      <div id="workerSwapView" style="display:none;">
+        <div class="card-swap">
+          <h2>List a shift for swap</h2>
+          <p class="desc">Only shifts you explicitly list here become visible to anyone else — nobody can browse your full schedule or see what you've earned.</p>
+          <div id="listShiftsView"></div>
+        </div>
+        <div class="card-swap">
+          <h2>Swap board</h2>
+          <p class="desc">Shifts colleagues have listed as open to swap. Offer one of yours in return to propose a trade.</p>
+          <div id="swapBoardView"></div>
+        </div>
+        <div class="card-swap">
+          <h2>Your requests</h2>
+          <div id="myRequestsView"></div>
+        </div>
+      </div>
+
+      <!-- Coordinator swap view -->
+      <div id="coordSwapView" style="display:none;">
+        <div class="card-swap">
+          <h2>Algorithm-suggested swaps</h2>
+          <p class="desc">A local-search pass over the allocation — trades between the highest and lowest earner that narrow the gap without creating a new clash.</p>
+          <div id="swapResult"></div>
+        </div>
+        <div class="card-swap">
+          <h2>Worker-submitted requests</h2>
+          <div id="pendingRequestsView"></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ===== PROFILE TAB ===== -->
+    <div class="panel" id="panel-profile">
+      <div class="card">
+        <h2>Your profile</h2>
+        <p class="desc">Shown to your coordinator on the team roster — a picture and a line about you, nothing else.</p>
+        <div class="profile-head">
+          <div id="avatarPreviewWrap"></div>
+          <div>
+            <div class="profile-name" id="profileNameDisplay"></div>
+            <label for="avatarInput" class="ghost" style="display:inline-block; margin-top:8px; padding:7px 12px; border-radius:7px; cursor:pointer; font-size:0.82rem; border:1px solid var(--line);">Change photo</label>
+            <input type="file" id="avatarInput" accept="image/*" style="display:none;">
+          </div>
+        </div>
+        <label for="aboutInput">About you</label>
+        <textarea id="aboutInput" rows="3" placeholder="e.g. Second-year CS student, mostly cover evening security and TA shifts." style="width:100%; padding:10px 11px; border:1px solid var(--line); border-radius:7px; background:var(--panel-raised); color:var(--ink); font-family:inherit; font-size:0.9rem; resize:vertical;"></textarea>
+        <div style="margin-top:14px;"><button class="primary" id="saveProfileBtn">Save profile</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toastContainer"></div>
+
+<script src="js/scheduling.js"></script>
+<script src="js/app.js"></script>
+
+</body>
+</html>
